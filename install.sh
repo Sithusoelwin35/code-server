@@ -92,7 +92,101 @@ npm package has been installed.
 
 Extend your path to use code-server:
   PATH="$NPM_BIN_DIR:\$PATH"
-Then run with:
+Then run with:/bin/sh
+set -eu
+
+# code-server's automatic install script.
+# See https://coder.com/docs/code-server/latest/install
+
+usage() {
+  arg0="$0"
+  if [ "$0" = sh ]; then
+    arg0="curl -fsSL https://code-server.dev/install.sh | sh -s --"
+  else
+    not_curl_usage="The latest script is available at https://code-server.dev/install.sh
+"
+  fi
+
+  cath << EOF
+Installs code-server.
+It tries to use the system package manager if possible.
+After successful installation it explains how to start using code-server.
+
+Pass in user@host to install code-server on user@host over ssh.
+The remote host must have internet access.
+${not_curl_usage-}
+Usage:
+
+  $arg0 [--dry-run] [--version X.X.X] [--edge] [--method detect] \
+        [--prefix ~/.local] [--rsh ssh] [user@host]
+
+  --dry-run
+      Echo the commands for the install process without running them.
+
+  --version X.X.X
+      Install a specific version instead of the latest.
+
+  --edge
+      Install the latest edge version instead of the latest stable version.
+
+  --method [detect | standalone]
+      Choose the installation method. Defaults to detect.
+      - detect detects the system package manager and tries to use it.
+        Full reference on the process is further below.
+      - standalone installs a standalone release archive into ~/.local
+        Add ~/.local/bin to your \$PATH to use it.
+
+  --prefix <dir>
+      Sets the prefix used by standalone release archives. Defaults to ~/.local
+      The release is unarchived into ~/.local/lib/code-server-X.X.X
+      and the binary symlinked into ~/.local/bin/code-server
+      To install system wide pass --prefix=/usr/local
+
+  --rsh <bin>
+      Specifies the remote shell for remote installation. Defaults to ssh.
+
+The detection method works as follows:
+  - Debian, Ubuntu, Raspbian: install the deb package from GitHub.
+  - Fedora, CentOS, RHEL, openSUSE: install the rpm package from GitHub.
+  - Arch Linux: install from the AUR (which pulls releases from GitHub).
+  - FreeBSD, Alpine: install from npm.
+  - macOS: install using Homebrew if installed otherwise install from GitHub.
+  - All others: install the release from GitHub.
+
+We only build releases on GitHub for amd64 and arm64 on Linux and amd64 for
+macOS. When the detection method tries to pull a release from GitHub it will
+fall back to installing from npm when there is no matching release for the
+system's operating system and architecture.
+
+The standalone method will force installion using GitHub releases. It will not
+fall back to npm so on architectures without pre-built releases this will error.
+
+The installer will cache all downloaded assets into ~/.cache/code-server
+
+More installation docs are at https://coder.com/docs/code-server/latest/install
+EOF
+}
+
+echo_latest_version() {
+  if [ "${EDGE-}" ]; then
+    version="$(curl -fsSL https://api.github.com/repos/coder/code-server/releases | awk 'match($0,/.*"html_url": "(.*\/releases\/tag\/.*)".*/)' | head -n 1 | awk -F '"' '{print $4}')"
+  else
+    # https://gist.github.com/lukechilds/a83e1d7127b78fef38c2914c4ececc3c#gistcomment-2758860
+    version="$(curl -fsSLI -o /dev/null -w "%{url_effective}" https://github.com/coder/code-server/releases/latest)"
+  fi
+  version="${version#https://github.com/coder/code-server/releases/tag/}"
+  version="${version#v}"
+  echo "$version"
+}
+
+echo_npm_postinstall() {
+  echoh
+  cath << EOF
+npm package has been installed.
+
+Extend your path to use code-server:
+  PATH="$NPM_BIN_DIR:\$PATH"
+
   code-server
 EOF
 }
